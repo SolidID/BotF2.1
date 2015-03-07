@@ -3,5 +3,5 @@ BotF2
 A 4x turn based strategy game that is inspired by the Game "Star Trek: Birth of the Federation". 
 
 Build with:
-- Unity 4.3.4
+- Unity 5
 - Visual Studio 2013 (Alternatively the  build-in MonoDevelop)
