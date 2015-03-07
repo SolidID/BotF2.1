@@ -1,0 +1,36 @@
+﻿<Window x:Class="TerrainGenerator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:system="clr-namespace:System;assembly=mscorlib"
+        xmlns:terrainGenerator="clr-namespace:TerrainGenerator"
+        Title="MainWindow" Height="1080" Width="1184">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="150"></ColumnDefinition>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <StackPanel Grid.Column="0" Margin="5">
+            <StackPanel.Resources>
+                <system:Double x:Key="IntMax">2147483647</system:Double>
+                <ObjectDataProvider x:Key="InitTypes" MethodName="GetValues" ObjectType="{x:Type system:Enum}">
+                    <ObjectDataProvider.MethodParameters>
+                        <x:Type TypeName="terrainGenerator:DiamondSquareInitType" />
+                    </ObjectDataProvider.MethodParameters>
+                </ObjectDataProvider>
+            </StackPanel.Resources>
+            <Button Content="Generate" Name="GenerateIt" Click="ButtonBase_OnClick"></Button>
+            <Button Content="Texture" Name="TextureIt" Click="TextureItClick"></Button>
+            <Button Content="Generate &amp; Texture" Name="DoAll" Click="DoAll_OnClick"></Button>
+            <TextBlock Text="Size:" />
+            <TextBox Name="SizeInupt" Text="1024" />
+            <TextBlock Text="PixelInitType" />
+            <ComboBox Name="InitTypeBox" SelectedIndex="0" ItemsSource="{Binding Source={StaticResource InitTypes}}"/>
+            <TextBlock Text="{Binding ElementName=SeedSlider, Path=Value, StringFormat=Seed: {0:0}}" />
+            <Slider Name="SeedSlider" Value="1337" Maximum="{StaticResource ResourceKey=IntMax}" />
+            <TextBlock Text="{Binding ElementName=RoughnessSlider, Path=Value, StringFormat=Roughness: {0:0.###}}" />
+            <Slider Name="RoughnessSlider" Value="1" Maximum="2" />
+            <Button Content="Save..." Name="SaveButton" Click="SaveButton_OnClick"/>
+        </StackPanel>
+        <Image Grid.Column="1" Name="ImageHolder" ClipToBounds="True"></Image>
+    </Grid>
+</Window>
