@@ -1,14 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using Assets.Scripts.API;
+﻿using Assets.Scripts.API;
 using Assets.Scripts.API.Observers;
 using Assets.Scripts.Configuration;
 using Assets.Scripts.Debug;
-using Assets.Scripts.Extensions;
 using Assets.Scripts.GameComponents.Input;
 using Assets.Scripts.GameComponents.Meshes;
 using BotF2.TerrainGeneration.DiamondSquare;
 using BotF2.TerrainGeneration.Texture;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Random = UnityEngine.Random;
@@ -109,18 +108,6 @@ namespace Assets.Scripts.GameComponents
 				return;
 
 			Vector3 randomPosition = Vector3.Scale(Random.insideUnitSphere * Globals.Radius / 3, new Vector3(1, 0, 1));
-			//GameObject sun = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-			//Sun = sun;
-			//float sunSize = Random.Range(.5f, 1f);
-			//sun.gameObject.transform.localScale = new Vector3(sunSize, sunSize, sunSize);
-			//sun.gameObject.transform.parent = transform;
-			//sun.gameObject.transform.localPosition = randomPosition + new Vector3(0, 0, 0);
-			//var sunColor = new Color(Random.Range(0f, 1), Random.Range(0f, 1), Random.Range(0f, 1));
-			//var sunMat = new Material(Shader.Find("Self-Illumin/Diffuse"))
-			//{
-			//	color = sunColor
-			//};
-			//sun.gameObject.transform.renderer.material = sunMat;
 
 			GameObject sun = Instantiate(Resources.Load("Prefabs/SunPrefab"), randomPosition, Quaternion.identity) as GameObject;
 			float sunSize = Random.Range(.1f, .4f);
@@ -129,10 +116,6 @@ namespace Assets.Scripts.GameComponents
 			sun.transform.rotation = new Quaternion(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
 			sun.transform.localPosition = randomPosition + new Vector3(0, 0, 0);
 			var sunColor = new Color(Random.Range(0f, 1), Random.Range(0f, 1), Random.Range(0f, 1));
-			//var sunMat = new Material(Shader.Find("Self-Illumin/Diffuse"))
-			//{
-			//	color = sunColor
-			//};
 
 			sun.transform.FindChild("Sun").GetComponent<Renderer>().material.SetColor("_Color", sunColor);
 			sun.transform.FindChild("FwdRadiation").GetComponent<Renderer>().material.SetColor("_DiffuseColorAdjustment", sunColor);
