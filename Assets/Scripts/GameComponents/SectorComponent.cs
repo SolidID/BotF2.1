@@ -2,47 +2,44 @@
 using Assets.Scripts.API.Observers;
 using Assets.Scripts.Configuration;
 using Assets.Scripts.Debug;
+using Assets.Scripts.Extensions;
 using Assets.Scripts.GameComponents.Input;
 using Assets.Scripts.GameComponents.Meshes;
 using BotF2.TerrainGeneration.DiamondSquare;
 using BotF2.TerrainGeneration.Texture;
 using System;
 using System.Collections.Generic;
+using Assets.Scripts.Model;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Random = UnityEngine.Random;
 
 namespace Assets.Scripts.GameComponents
 {
-
 	public class SectorComponent : MonoBehaviour, IEndTurnObserver, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 	{
 		public SectorMesh SectorMesh { get; set; }
 		public Material Material { get; set; }
 		public bool Selected { get; private set; }
-		public List<GameObject> Planets { get; private set; }
-		public GameObject Sun { get; private set; }
+		public List<GameObject> Planets { get; set; }
+		public GameObject Sun { get; set; }
 		public ISector Model { get; set; }
 
 		private bool IsSystem { get { return Sun != null; } }
 
 		private GameObject _sectorNameHolder;
 		private readonly Vector3 _textOffset = new Vector3(0, 0, -1);
-
-		void Start()
-		{
-		}
+		private bool _sunVisible;
+		private bool _planetVisible;
 
 		public void InitializeComponents()
 		{
 			var sector = new GameObject("SectorComponent" + Model.Coordinates);
-			sector.AddComponent<SectorMesh>();
-			SectorMesh = sector.GetComponent<SectorMesh>();
+
+			SectorMesh = sector.AddComponent<SectorMesh>();
 			sector.transform.parent = transform;
 			sector.transform.localPosition = new Vector3(0, 0, 0);
 			sector.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/sector_grid");
-
-			GenerateSystem();
 
 			if (IsSystem)
 			{
@@ -57,15 +54,17 @@ namespace Assets.Scripts.GameComponents
 
 		void Update()
 		{
+			CheckSunVisibility();
+
 			if (Selected)
 			{
-				DebugOutput.Instance.AddMessage("Selected Sector: " + Model.Name);
-				if (Planets != null && Planets.Count > 0)
-					foreach (var planet in Planets)
-					{
-						float currentAngle = planet.transform.rotation.eulerAngles.y;
-						planet.transform.rotation = Quaternion.AngleAxis(currentAngle + (10 * Time.deltaTime), Vector3.up);
-					}
+				DebugOutput.Instance.AddMessage("Selected Sector: {0}".FormatWith(Model.Name));
+				//if (Planets != null && Planets.Count > 0)
+				//	foreach (var planet in Planets)
+				//	{
+				//		float currentAngle = planet.transform.rotation.eulerAngles.y;
+				//		planet.transform.rotation = Quaternion.AngleAxis(currentAngle + (10 * Time.deltaTime), Vector3.up);
+				//	}
 			}
 
 			// text positioning
@@ -80,7 +79,7 @@ namespace Assets.Scripts.GameComponents
 				// checking if the size of the text is smaller than the hex field
 				if (
 						SectorMesh.GetComponent<Renderer>().bounds.size.x * pixelPerUnit > _sectorNameHolder.GetComponent<GUIText>().GetScreenRect().width
-						|| Camera.main.orthographicSize <= 45
+						|| CameraController.Instance.Distance <= 75
 				   )
 				{
 					_sectorNameHolder.SetActive(true);
@@ -97,29 +96,52 @@ namespace Assets.Scripts.GameComponents
 			}
 		}
 
-		void LateUpadte()
+		private void CheckSunVisibility()
 		{
-		}
-
-		private void GenerateSystem()
-		{
-			// calculating the chance that this is a system
-			if (Model.Planets.Count == 0)
+			if (!IsSystem)
 				return;
 
-			Vector3 randomPosition = Vector3.Scale(Random.insideUnitSphere * Globals.Radius / 3, new Vector3(1, 0, 1));
+			if (CameraController.Instance.Distance > 250)
+			{
+				if (!_sunVisible)
+					return;
 
-			GameObject sun = Instantiate(Resources.Load("Prefabs/SunPrefab"), randomPosition, Quaternion.identity) as GameObject;
-			float sunSize = Random.Range(.1f, .4f);
-			sun.transform.localScale = new Vector3(sunSize, sunSize, sunSize);
-			sun.transform.parent = transform;
-			sun.transform.rotation = new Quaternion(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-			sun.transform.localPosition = randomPosition + new Vector3(0, 0, 0);
-			var sunColor = new Color(Random.Range(0f, 1), Random.Range(0f, 1), Random.Range(0f, 1));
+				Sun.SetActive(false);
 
-			sun.transform.FindChild("Sun").GetComponent<Renderer>().material.SetColor("_Color", sunColor);
-			sun.transform.FindChild("FwdRadiation").GetComponent<Renderer>().material.SetColor("_DiffuseColorAdjustment", sunColor);
-			sun.transform.FindChild("BwdRadiation").GetComponent<Renderer>().material.SetColor("_DiffuseColorAdjustment", sunColor);
+				_sunVisible = false;
+			}
+			else
+			{
+				if (Vector3.Distance(Camera.main.transform.position, transform.position) < 75f)
+				{
+					if (!_planetVisible)
+						CreatePlanets(Sun.transform.localScale.x, Sun);
+				}
+				else
+				{
+					DestroyPlanets();
+				}
+
+				if (_sunVisible)
+					return;
+
+				//Sun.SetActive(true);
+				_sunVisible = true;
+			}
+		}
+
+		private void DestroyPlanets()
+		{
+			foreach (var planet in Planets)
+			{
+				Destroy(planet);
+			}
+			_planetVisible = false;
+		}
+
+		void LateUpdate()
+		{
+
 		}
 
 		// TODO extract PlanetComponent + Factory
@@ -129,7 +151,7 @@ namespace Assets.Scripts.GameComponents
 			Planets = new List<GameObject>(countPlanets);
 			for (int i = 0; i < countPlanets; i++)
 			{
-				Vector3 randomPlanetPosition = Vector3.Scale(Random.insideUnitSphere * 2, new Vector3(1, 0, 1));
+				Vector3 randomPlanetPosition = Vector3.Scale(Random.insideUnitSphere * sunSize, new Vector3(1, 0, 1));
 				GameObject planet = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 				float planetSize = Random.Range(0.33f, sunSize / 2);
 				planet.gameObject.transform.localScale = new Vector3(planetSize, planetSize, planetSize);
@@ -160,6 +182,8 @@ namespace Assets.Scripts.GameComponents
 				planet.gameObject.transform.GetComponent<Renderer>().material = mat;
 				Planets.Add(planet);
 			}
+
+			_planetVisible = true;
 		}
 
 		private static float[,] GetHeightData(Texture2D heightMap)
@@ -244,7 +268,7 @@ namespace Assets.Scripts.GameComponents
 		public void OnPointerClick(PointerEventData eventData)
 		{
 			Selected = true;
-			SectorMesh.gameObject.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/sector_grid");
+			SectorMesh.gameObject.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/sector_grid_selected");
 			SectorMesh.gameObject.GetComponent<Renderer>().material.color = GameSettings.Instance.SelectedSectorColor;
 
 			if (IsSystem)

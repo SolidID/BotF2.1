@@ -4,11 +4,19 @@ using Assets.Scripts.Extensions;
 using BotF2.Core.Extensions;
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace Assets.Scripts.GameComponents.Input
 {
 	public class CameraController : MonoBehaviour
 	{
+		private static CameraController _instance;
+
+		public static CameraController Instance
+		{
+			get { return _instance ?? (_instance = FindObjectOfType<CameraController>()); }
+		}
+
 		private float _maxZoomOutLevel = -1;
 		private float _maxZoomInLevel = 10f;
 		public float ScrollSpeed = 0.2f;
@@ -41,13 +49,43 @@ namespace Assets.Scripts.GameComponents.Input
 			get { return ((GameSettings.Instance.GalaxySize - 1) * 1.5f * Globals.Radius + Globals.Height); }
 		}
 
+		public float Distance { get; private set; }
+		public Plane[] Planes { get; private set; }
+
 		void Awake()
 		{
+			if (_instance == null)
+			{
+				_instance = this;
+			}
+			else
+			{
+				if (_instance != this)
+					Destroy(gameObject);
+			}
 		}
 
-		// Update is called once per frame
+		void Update()
+		{
+			if (IsOrthoGraphic)
+			{
+				Distance = Camera.main.orthographicSize;
+			}
+			else
+			{
+				Distance = Camera.main.transform.position.y;
+			}
+			Planes = GeometryUtility.CalculateFrustumPlanes(Camera.main);
+		}
+
 		void LateUpdate()
 		{
+
+			DebugOutput.Instance.AddMessage("IsPointerOverUI: {0}".FormatWith(UISystem.Instance.IsMouseOverUiElement()));
+			// do not scroll, zoom etc when the mouse is over a UI Element
+			//if (UISystem.Instance.IsMouseOverUiElement())
+			//	return;
+
 			if (IsOrthoGraphic)
 			{
 				if (Math.Abs(_maxZoomOutLevel - (-1f)) < 0.0001f) // fix the initial value
@@ -92,47 +130,90 @@ namespace Assets.Scripts.GameComponents.Input
 
 		private void HandlePerspectiveMovement()
 		{
-			if (HandlePerspectiveCameraMovementByMouseDrag()) return;
-
-			//HandlePerspectiveCameraMovementByKeyboard();
+			HandlePerspectiveCameraMovementByMouseDrag();
 		}
 
-		private bool HandlePerspectiveCameraMovementByMouseDrag()
+		private void HandlePerspectiveCameraMovementByMouseDrag()
 		{
+			//if (UnityEngine.Input.GetMouseButtonDown(0))
+			//{
+			//	if (!_isInDragMode)
+			//	{
+			//		RaycastHit hit;
+			//		Physics.Raycast(Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition), out hit);
+
+			//		_dragStartCoords = GameObject.Find("Map").transform.position - hit.point;
+			//	}
+			//	_isInDragMode = true;
+			//}
+
+			//if (UnityEngine.Input.GetMouseButtonUp(0))
+			//{
+			//	_isInDragMode = false;
+			//}
+
+
+			//if (_isInDragMode)
+			//{
+			//	//Get the screen coordinate of some point
+			//	RaycastHit hit;
+			//	Physics.Raycast(Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition), out hit);
+			//	if (hit.transform != null)
+			//	{
+			//		GameObject.Find("Map").transform.position = _dragStartCoords + hit.point;
+			//		DebugOutput.Instance.AddMessage("{0}|{1}|{2}".FormatWith(GameObject.Find("Map").transform.position, _dragStartCoords, hit.point));
+			//	}
+			//}
+
 			if (UnityEngine.Input.GetMouseButtonDown(0))
 			{
-				if (!_isInDragMode)
-				{
-					RaycastHit hit;
-					Physics.Raycast(Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition), out hit);
-
-					_dragStartCoords = GameObject.Find("Map").transform.position - hit.point;
-					//_cameraDragStartCoords = CameraHolder.position;
-				}
 				_isInDragMode = true;
+				_dragStartCoordinates = UnityEngine.Input.mousePosition;
+				_cameraDragStartPosition = Camera.main.transform.position;
 			}
 
 			if (UnityEngine.Input.GetMouseButtonUp(0))
 			{
 				_isInDragMode = false;
+				_dragStartCoordinates = default(Vector3);
 			}
 
+			// allways assuming that point 0 for the y is my game "plane"
+			// I the height of the camera 
+			float myCurrentHeight = Camera.main.transform.position.y;
 
-			if (_isInDragMode)
+			// I know the angle of the Field of view
+			float angle = Camera.main.fieldOfView;
+
+			// I know the ratio of the screen
+			float ratio = (float)Screen.width / Screen.height;
+
+			// so I can calculate how many units I see at level 0
+			float c = myCurrentHeight;
+			float alpha = angle / 2f;
+			float beta = 90f;
+			float gamma = 180f - alpha - beta;
+			//b / c = sin(beta) / sin(gamma) => b = sin(beta) / sin(gamma) * c
+			float b = Mathf.Sin(beta * Mathf.Deg2Rad) / (float)Math.Sin(gamma * Mathf.Deg2Rad) * c;
+
+			// then my a is 
+			var a = (float)Math.Sqrt(b * b - c * c);
+
+			// a is the units i see half the way up. so...
+			float verticalUnits = 2 * a;
+			float horizontalUnits = verticalUnits * ratio;
+
+
+			if (IsDragging)
 			{
-				//Get the screen coordinate of some point
-				RaycastHit hit;
-				Physics.Raycast(Camera.main.ScreenPointToRay(UnityEngine.Input.mousePosition), out hit);
-				if (hit.transform != null)
-				{
-					GameObject.Find("Map").transform.position = _dragStartCoords + hit.point;
-					DebugOutput.Instance.AddMessage("{0}|{1}|{2}".FormatWith(GameObject.Find("Map").transform.position, _dragStartCoords, hit.point));
-				}
-
-				return true;
+				// calculate camera movement (everything is relative)
+				Vector3 moved = _dragStartCoordinates - UnityEngine.Input.mousePosition;
+				Camera.main.transform.position = _cameraDragStartPosition + new Vector3(horizontalUnits * moved.x / Screen.width, 0, verticalUnits * moved.y / Screen.height);
 			}
-			return false;
+
 		}
+
+		public bool IsDragging { get { return _isInDragMode && _dragStartCoordinates != UnityEngine.Input.mousePosition; } }
 
 		private void HandleOrthographicMovement()
 		{
@@ -246,6 +327,9 @@ namespace Assets.Scripts.GameComponents.Input
 		}
 
 		private float _perspectiveTargetY = 100f;
+		private Vector3 _dragStartCoordinates;
+		private Vector3 _cameraDragStartPosition;
+
 		private void HandlePerspectiveZoom()
 		{
 			float scroll = UnityEngine.Input.GetAxis("Mouse ScrollWheel");

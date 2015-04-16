@@ -7,6 +7,7 @@ using Assets.Scripts.Model;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Assets.Scripts.GameComponents.Factories;
 using UnityEngine;
 using UnityEngine.UI;
 
